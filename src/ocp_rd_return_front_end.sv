@@ -1,0 +1,85 @@
+`include "gen_macros.sv"
+typedef struct packed{
+ logic [3:0] id;
+ logic [3:0] length;
+ logic [31:0] addr;
+}axi_addr_pkt;
+
+typedef struct packed{
+ logic [3:0] id;
+ logic [3:0] length;
+ logic [31:0] d15,d14,d13,d12,d11,d10,d9,d8,d7,d6,d5,d4,d3,d2,d1,d0;
+} axi_data_pkt;
+
+typedef struct packed{
+ logic [3:0] id;
+ logic [3:0] length;
+ logic [31:0] addr;
+ logic [31:0] d15, d14, d13, d12, d11, d10, d9, d8, d7, d6, d5, d4, d3, d2, d1, d0;
+}axi_addr_data_pkt;
+
+module ocp_rd_return_front_end(
+input logic clk,rst,
+ocp_intf ocp_intf1,
+input logic hold_in,
+output logic ocp_rd_resp_pkt_vld,
+output axi_data_pkt ocp_rd_resp_pkt);
+logic [31:0] din,d15,d14,d13,d12,d11,d10,d9,d8,d7,d6,d5,d4,d3,d2,d1,d0;
+logic[3:0] dcount,dcount_nxt,dcount_prev,id_prev;
+logic dclear,rlast,last_prev;
+
+always @(posedge clk)
+begin
+ocp_intf1.MRepAccept=!hold_in;
+rlast=(ocp_intf1.Sresp===null) & ocp_intf1.SRespLast?1:0;
+din[31:0]=ocp_intf1.sData[31:0];
+dcount_nxt[3:0]=rlast?4'b0:(ocp_intf1.SResp==null)&ocp_intf1.MRespAccept? dcount_nxt[3:0]+4'h1:dcount[3:0];
+dclear=!(dcount=='0);
+end
+
+`DFF_async_rst(dcount,dcount_nxt,clk,rst,'0)
+`DFF_async_rst(last_prev,rlast,clk,rst,'0)
+`DFF_async_rst_en(dcount_prev,dcount,clk,rlast,rst)
+`DFF_async_rst_en(id_prev,ocp_intf1.STagID,rlast,clk,rst)
+
+always @(posedge clk)
+begin
+ocp_rd_resp_pkt_vld=last_prev;
+ocp_rd_resp_pkt.id=last_prev?id_prev:'x;
+ocp_rd_resp_pkt.length=last_prev?dcount_prev:0;
+ocp_rd_resp_pkt.d15=d15;
+ocp_rd_resp_pkt.d14=d14;
+ocp_rd_resp_pkt.d13=d13;
+ocp_rd_resp_pkt.d12=d12;
+ocp_rd_resp_pkt.d11=d11;
+ocp_rd_resp_pkt.d10=d10;
+ocp_rd_resp_pkt.d9=d9;
+ocp_rd_resp_pkt.d8=d8;
+ocp_rd_resp_pkt.d7=d7;
+ocp_rd_resp_pkt.d6=d6;
+ocp_rd_resp_pkt.d5=d5;
+ocp_rd_resp_pkt.d4=d4;
+ocp_rd_resp_pkt.d3=d3;
+ocp_rd_resp_pkt.d2=d2;
+ocp_rd_resp_pkt.d1=d1;
+ocp_rd_resp_pkt.d0=d0;
+end
+
+`DFF_async_rst_en(d0,din,(dcount==4'h0),clk,rst)
+`DFF_async_rst_en(d1,din,(dcount==4'h1),clk,(rst|dclear))
+`DFF_async_rst_en(d2,din,(dcount==4'h2),clk,(rst|dclear))
+`DFF_async_rst_en(d3,din,(dcount==4'h3),clk,(rst|dclear))
+`DFF_async_rst_en(d4,din,(dcount==4'h4),clk,(rst|dclear))
+`DFF_async_rst_en(d5,din,(dcount==4'h5),clk,(rst|dclear))
+`DFF_async_rst_en(d6,din,(dcount==4'h6),clk,(rst|dclear))
+`DFF_async_rst_en(d7,din,(dcount==4'h7),clk,(rst|dclear))
+`DFF_async_rst_en(d8,din,(dcount==4'h8),clk,(rst|dclear))
+`DFF_async_rst_en(d9,din,(dcount==4'h9),clk,(rst|dclear))
+`DFF_async_rst_en(d10,din,(dcount==4'hA),clk,(rst|dclear))
+`DFF_async_rst_en(d11,din,(dcount==4'hB),clk,(rst|dclear))
+`DFF_async_rst_en(d12,din,(dcount==4'hC),clk,(rst|dclear))
+`DFF_async_rst_en(d13,din,(dcount==4'hD),clk,(rst|dclear))
+`DFF_async_rst_en(d14,din,(dcount==4'hE),clk,(rst|dclear))
+`DFF_async_rst_en(d15,din,(dcount==4'hF),clk,(rst|dclear))
+
+endmodule:ocp_rd_return_front_end

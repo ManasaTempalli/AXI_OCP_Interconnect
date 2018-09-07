@@ -1,0 +1,134 @@
+/********************FIFO_control****************************/
+module FIFO_control #(parameter DEPTH=8,WRSIZE=3)
+(input logic clk,
+ input logic rst,
+ input logic we,
+ input logic re,
+ output logic full,
+ output logic almost_full,
+ output logic empty,
+ output logic [WRSIZE:0] wptr,
+ output logic [WRSIZE-1:0] rptr);
+ parameter PTR_WIDTH=WRSIZE;
+
+ logic [PTR_WIDTH-1:0] wptr_inc1;
+ logic [PTR_WIDTH-1:0] wptr_inc2;
+ logic [PTR_WIDTH-1:0] wptr_nxt;
+ logic [PTR_WIDTH-1:0] rptr_inc;
+ logic [PTR_WIDTH-1:0] rptr_nxt;
+
+ logic almost_condition;
+ logic almost_full_nxt;
+ logic full_nxt;
+ logic empty_condition;
+ logic empty_nxt;
+ 
+//updating write pointer value based on reset and write-enable values 
+ always @ (posedge clk)
+ begin
+ if(rst==0)
+ begin
+  wptr_nxt='0;
+ end
+ else
+ begin
+  if(we==1 && wptr!=DEPTH-1)
+  begin
+   wptr_nxt=wptr+1;
+  end
+  else if (we==1 && wptr==DEPTH)
+  begin
+   wptr_nxt='0;
+  end
+  else 
+  begin 
+   wptr_nxt=wptr;
+  end
+ end
+ end
+
+//Similarly read pointer update
+ always @ (posedge clk)
+ begin
+ if(rst==0)
+ begin
+  rptr_nxt='0;
+ end
+ else
+ begin
+  if(re==1 && rptr!=DEPTH-1)
+  begin
+   rptr_nxt=rptr+1;
+  end
+  else if (re==1 && rptr==DEPTH)
+  begin
+   rptr_nxt='0;
+  end
+  else 
+  begin 
+   rptr_nxt=rptr;
+  end
+ end
+ end
+
+//Full conditions
+always @(posedge clk)
+begin
+ if(wptr+1!=DEPTH-1 && rptr==wptr+2)
+ begin
+  almost_condition=1;
+ end
+ else if(wptr+1==DEPTH-1 && rptr==0)
+ begin
+  almost_condition=1;
+ end
+else almost_condition=0;
+ 
+end
+
+always @(posedge clk)
+begin
+ unique casez({we,re})
+  2'b11: almost_full_nxt=almost_full;
+  2'b10: almost_full_nxt=almost_condition;
+  2'b01: almost_full_nxt=full;
+  2'b00: almost_full_nxt = almost_full;
+  default: almost_full_nxt = 1'bx;
+ endcase
+end
+
+always @(posedge clk)
+begin
+ unique casez({we,re})
+  2'b11: full_nxt=full;
+  2'b10: full_nxt=almost_full;
+  2'b01: full_nxt=1'b0;
+  2'b00: full_nxt = full;
+  default: full_nxt = 1'bx;
+ endcase
+end
+
+//Empty Conditions
+generate
+ if (DEPTH==1) begin
+  always @(posedge clk) empty_condition=(rptr+1==wptr)& ~full;
+ end
+ else
+ begin
+  always @(posedge clk) empty_condition=(rptr+1==wptr);
+ end
+endgenerate
+
+always @(posedge clk)
+begin
+ unique casez({we,re})
+  2'b11: empty_nxt=empty;
+  2'b10: empty_nxt=1'b0;
+  2'b01: empty_nxt=empty_condition;
+  2'b00: empty_nxt = empty;
+  default: empty_nxt = 1'bx;
+ endcase
+end
+endmodule:FIFO_control
+
+

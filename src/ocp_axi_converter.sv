@@ -1,0 +1,64 @@
+`include "gen_macros.sv"
+typedef struct packed{
+ logic [3:0] id;
+ logic [3:0] length;
+ logic [31:0] addr;
+}axi_addr_pkt;
+
+typedef struct packed{
+ logic [3:0] id;
+ logic [3:0] length;
+ logic [31:0] d15,d14,d13,d12,d11,d10,d9,d8,d7,d6,d5,d4,d3,d2,d1,d0;
+} axi_data_pkt;
+
+typedef struct packed{
+ logic [3:0] id;
+ logic [3:0] length;
+ logic [31:0] addr;
+ logic [31:0] d15, d14, d13, d12, d11, d10, d9, d8, d7, d6, d5, d4, d3, d2, d1, d0;
+}axi_addr_data_pkt;
+
+module ocp_axi_converter(
+input logic clk, rst,
+axi_rd_data_intf.MASTER rd_data_intf1,
+input logic hold_in,
+input logic ocp_rd_resp_pkt_vld,
+input axi_data_pkt ocp_rd_resp_pkt,
+output logic holdout);
+
+ logic data_fifo_we, data_fifo_re, data_fifo_full, data_fifo_empty;
+ axi_data_pkt data_fifo_wdata, data_fifo_rdata,pkt,pkt_updated;
+ logic [31:0] dout;
+ logic[3:0] dcount,dcount_nxt,pkt_length,pkt_length_prev;
+ logic rlast;
+ 
+ FIFO #(.WIDTH($bits(ocp_rd_resp_pkt)),.DEPTH(4),.PTR_SIZE(2)) ocp_data_fifo(
+.clk(clk),
+.rst(rst),
+.we(data_fifo_we),
+.wdata(data_fifo_wdata),
+.re(data_fifo_re),
+.rdata(data_fifo_rdata),
+.full(data_fifo_full),
+.empty(data_fifo_empty));
+
+always@(posedge clk)
+begin
+ data_fifo_we=ocp_rd_resp_pkt_vld & !data_fifo_full & !hold_in;
+ data_fifo_wdata=ocp_rd_resp_pkt;
+ holdout=data_fifo_full;
+ data_fifo_re=!data_fifo_empty&rd_data_intf1.rready&(dcount===0);
+ pkt_updated=data_fifo_rdata;
+ rd_data_intf1.rvalid=data_fifo_re|(dcount!==0);
+ rd_data_intf1.rid=data_fifo_re?pkt_updated.id:(dcount!==0)?pkt.id:'hx;
+ rd_data_intf1.rdata=dout;
+rd_data_intf1.rlast=rlast;
+ pkt_length=data_fifo_re?pkt_updated.length:pkt.length;
+ rlast=(dcount==pkt_length)?1:0;
+ dcount_nxt[3:0]=rlast?4'b0:(rd_data_intf1.rvalid&rd_data_intf1.rready)?dcount_nxt[3:0]+4'h1:dcount[3:0];
+
+end
+`DFF_async_rst(dcount,dcount_nxt,clk,rst,'0)
+`DFF_async_rst_en(pkt,pkt_updated,data_fifo_re,clk,rst)
+`mux_16(pkt_updated.d0,pkt.d1,pkt.d2,pkt.d3,pkt.d4,pkt.d5,pkt.d6,pkt.d7,pkt.d8,pkt.d9,pkt.d10,pkt.d11,pkt.d12,pkt.d13,pkt.d14,pkt.d15,dcount,dout);
+endmodule: ocp_axi_converter
